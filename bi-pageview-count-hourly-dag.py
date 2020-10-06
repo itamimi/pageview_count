@@ -12,8 +12,8 @@ default_args = {
 }
 
 
-dag = DAG('bi-pageview-count',
-          schedule_interval='',  #  make it running once an hour 
+dag = DAG('bi-pageview-count-hourly-dag',
+          schedule_interval='',  #  make it running once an hour
           catchup=False,
           max_active_runs=1,
           default_args=default_args
@@ -26,7 +26,7 @@ dag = DAG('bi-pageview-count',
 # function 1 : run SQL script with no parameters
 def bi_fnc_run_sql_script(date_cutoff, hour_cutoff, file_name, fnc_cursor ):
     logging.info('START bi_fnc_run_sql_script')
-    path = '/itamimi/' + file_name   #the path to SQL file  it depends on how its implemented in Airflow
+    path = '/etl_sql_scripts/' + file_name   #the path to SQL file  it depends on how its implemented in Airflow
     sql_file = open(dag_folder + path , 'r')
     query_text = sql_file.read()
     sql_file.close()
@@ -38,7 +38,7 @@ def bi_fnc_run_sql_script(date_cutoff, hour_cutoff, file_name, fnc_cursor ):
 # function 2 : run SQL script  using two parameters Date and hours
 def bi_fnc_run_sql_script_date_hour_cutoff(date_cutoff, hour_cutoff, file_name, fnc_cursor ):
     logging.info('START bi_fnc_run_sql_script_date_hour_cutoff')
-    path = '/itamimi/' + file_name   #the path to SQL file  it depends on how its implemented in Airflow
+    path = '/etl_sql_scripts/' + file_name   #the path to SQL file  it depends on how its implemented in Airflow
     sql_file = open(dag_folder + path , 'r')
     query_text = sql_file.read()
     sql_file.close()
@@ -62,8 +62,8 @@ def bi_fnc_run_pageviews_user_history(ds, **kwargs):
 
 
 #function 4: delete recent entries in pageviews_postcode_history_count and re-populate it
-def bi_fnc_run_pageviews_postcode_history_count(ds, **kwargs):
-    logging.info('START bi_fnc_run_pageviews_postcode_history_count')
+def bi_fnc_run_pageviews_postcode_count_hourly(ds, **kwargs):
+    logging.info('START bi_fnc_run_pageviews_postcode_count_hourly')
     db_1 = SnowflakeHook('snowflake_bi')
     db1_conn = db_1.get_conn()
     db1_cursor = db1_conn.cursor()
@@ -80,7 +80,7 @@ def bi_fnc_run_pageviews_postcode_history_count(ds, **kwargs):
     if hour_cutoff < 0:  #since buffer in day cut off can cause negatives at start of the day
         hour_cutoff = 0
 
-
+    # populate the historical postcode count table
     logging.info('START delete_pageviews_postcode_history_count')
     bi_fnc_run_sql_script_date_hour_cutoff(date_cutoff, hour_cutoff, 'delete_pageviews_postcode_history_count.sql', db1_cursor)  # see git repository for SQL script
     logging.info('END delete_pageviews_postcode_history_count')
@@ -89,10 +89,19 @@ def bi_fnc_run_pageviews_postcode_history_count(ds, **kwargs):
     bi_fnc_run_sql_script_date_hour_cutoff(date_cutoff, hour_cutoff, 'insert_pageviews_postcode_history_count.sql', db1_cursor)   # see git repository for SQL script
     ogging.info('START insert_pageviews_postcode_history_count')
 
+    # populate the current(now) postcode count table
+    logging.info('START delete_pageviews_postcode_now_count_hourly')
+    bi_fnc_run_sql_script_date_hour_cutoff(date_cutoff, hour_cutoff, 'delete_pageviews_postcode_now_count_hourly.sql', db1_cursor)  # see git repository for SQL script
+    logging.info('END delete_pageviews_postcode_now_count_hourly')
+
+    ogging.info('START insert_pageviews_postcode_now_count_hourly')
+    bi_fnc_run_sql_script_date_hour_cutoff(date_cutoff, hour_cutoff, 'insert_pageviews_postcode_now_count_hourly.sql', db1_cursor)   # see git repository for SQL script
+    ogging.info('START insert_pageviews_postcode_now_count_hourly')
+
     db1_cursor.close()
     db1_conn.commit()
     db1_conn.close()
-    logging.info('END bi_fnc_run_pageviews_postcode_history_count')
+    logging.info('END bi_fnc_run_pageviews_postcode_count_hourly')
 
 
 
@@ -106,22 +115,22 @@ wait_for_extract = ExternalTaskSensor(
         external_task_id='insert_hour_pageviews',  # assume the task is named that way in  insert_pageviews_extract dag.
         execution_delta=None,  # Same day as today
         mode='reschedule',
-        dag=dag,
+        dag=dag
     )
 
-#once the extract is completed for pageviews, dump the data into  pageviews_user_history  table 
-insert_pageviews_user_history= PythonOperator(
-    task_id='insert_pageviews_user_history',
+#once the extract is completed for pageviews, dump the data into  pageviews_user_history  table
+run_pageviews_user_history_hourly= PythonOperator(
+    task_id='run_pageviews_user_history_hourly',
     provide_context=True,
     python_callable=bi_fnc_run_pageviews_user_history,
     on_failure_callback=slack_failed_task,
     dag=dag)
 
-# once the table pageviews_user_history is populated with recent data, update pageviews_postcode_history_count  table 
-insert_pageviews_postcode_history_count = PythonOperator(
-    task_id='insert_pageviews_postcode_history_count',
+# once the table pageviews_user_history is populated with recent data, update pageviews_postcode_history_count  table
+run_pageviews_postcode_count_hourly = PythonOperator(
+    task_id='run_pageviews_postcode_count_hourly',
     provide_context=True,
-    python_callable=bi_fnc_run_pageviews_postcode_history_count,
+    python_callable=bi_fnc_run_pageviews_postcode_count_hourly,
     on_failure_callback=slack_failed_task,
     dag=dag)
 """ 
@@ -130,4 +139,4 @@ DAG hierarchy here
 ----------------------------------------------
 """
 
-wait_for_extract >> insert_pageviews_user_history >> insert_pageviews_postcode_history_count
+wait_for_extract >> run_pageviews_user_history_hourly >> run_pageviews_postcode_count_hourly
