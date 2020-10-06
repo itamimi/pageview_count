@@ -11,6 +11,4 @@ count(puh.*) -- assume pageview is count for any page from any user
 from  bi_analytic.Pageviews_user_history as puh
 join  bi_db.users_extract as ue
 on puh.user_id = ue.id
-where puh.pageview_datetime :: date >= %(date_cutoff)s
-and   hour(puh.pageview_datetime) >= %(hour_cutoff)s
 group by 1 , 2, 3
