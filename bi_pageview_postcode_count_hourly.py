@@ -1,14 +1,14 @@
 from datetime import date, timedelta
 from airflow import DAG
 
-
+dag_folder = os.path.dirname(os.path.realpath(__file__))
 # Default dag args
 default_args = {
     'owner': 'bi team',
     'retries': 0,
     'retry_delay': timedelta(minutes=0),
     'catchup': False,
-    'start_date': datetime(2020, 1, 1)}
+    'start_date': datetime(2020, 1, 1),
 }
 
 
