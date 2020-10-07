@@ -1,14 +1,14 @@
 from datetime import date, timedelta
 from airflow import DAG
 
-
+dag_folder = os.path.dirname(os.path.realpath(__file__))
 # Default dag args
 default_args = {
     'owner': 'bi team',
     'retries': 0,
     'retry_delay': timedelta(minutes=0),
     'catchup': False,
-    'start_date': datetime(2020, 1, 1)}
+    'start_date': datetime(2020, 1, 1),
 }
 
 
@@ -41,13 +41,13 @@ def bi_fnc_run_pageviews_postcode_now_count_daily(ds, **kwargs):
 
     # truncate all bi_analytic.pageviews_postcode_now_count table
     logging.info('START truncate_pageviews_postcode_now_count_daily')
-    bi_fnc_run_sql_script_date_hour_cutoff('truncate_pageviews_postcode_now_count_daily.sql', db1_cursor)  # see git repository for SQL script
+    bi_fnc_run_sql_script('truncate_pageviews_postcode_now_count_daily.sql', db1_cursor)  # see git repository for SQL script
     logging.info('END truncate_pageviews_postcode_now_count_daily')
 
     # repopulate all bi_analytic.pageviews_postcode_now_count table with up to date postcode from user table
     #NOTE: all historical data from all date will be repopulated , see sql file
     ogging.info('START insert_pageviews_postcode_now_count_daily')
-    bi_fnc_run_sql_script_date_hour_cutoff('insert_pageviews_postcode_now_count_daily.sql', db1_cursor)   # see git repository for SQL script
+    bi_fnc_run_sql_script('insert_pageviews_postcode_now_count_daily.sql', db1_cursor)   # see git repository for SQL script
     ogging.info('START insert_pageviews_postcode_now_count_daily')
 
     db1_cursor.close()
