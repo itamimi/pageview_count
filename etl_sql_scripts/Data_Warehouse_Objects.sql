@@ -40,7 +40,6 @@ postcode varchar(20)
 
 create  table  bi_analytic.pageviews_postcode_now_count
 (
-pageviews_postcode_now_count_id bigint AUTOINCREMENT (1,1) ,
 date date,   -- yyyy-mm-dd
 hour int,
 postcode varchar(20),
@@ -51,7 +50,6 @@ pageviews_count bigint
 
 create  table  bi_analytic.pageviews_postcode_history_count
 (
-pageviews_postcode_history_count_id bigint AUTOINCREMENT (1,1) ,
 date date,   -- yyyy-mm-dd
 hour int,
 postcode varchar(20),
